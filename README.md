@@ -109,7 +109,7 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 
 ## Known limitations
 
-- Any authenticated user can update or delete any product (no ownership or roles).
+- Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
 - Registration is open and login attempts are not limited (no lockout or rate limiting).
 - Tokens last 60 minutes, with no refresh or revocation.
 - `/health` does not check the database.

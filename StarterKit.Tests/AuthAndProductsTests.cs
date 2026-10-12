@@ -89,5 +89,66 @@ namespace StarterKit.Tests
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
+
+        [Fact]
+        public async Task Owner_can_update_and_delete_their_product()
+        {
+            var owner = CreateClientFor(await RegisterAndLoginAsync());
+            var id = await CreateProductAsync(owner);
+
+            var update = await owner.PutAsJsonAsync($"/api/products/{id}", new ProductRequest("Updated", null, 1m));
+            Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+            var delete = await owner.DeleteAsync($"/api/products/{id}");
+            Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+
+            var get = await owner.GetAsync($"/api/products/{id}");
+            Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+        }
+
+        [Fact]
+        public async Task Another_user_cannot_update_a_product_they_do_not_own()
+        {
+            var owner = CreateClientFor(await RegisterAndLoginAsync());
+            var intruder = CreateClientFor(await RegisterAndLoginAsync());
+            var id = await CreateProductAsync(owner);
+
+            var response = await intruder.PutAsJsonAsync($"/api/products/{id}", new ProductRequest("Hacked", null, 1m));
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+            var current = await owner.GetFromJsonAsync<ProductResponse>($"/api/products/{id}");
+            Assert.Equal("Original", current!.Name);
+        }
+
+        [Fact]
+        public async Task Another_user_cannot_delete_a_product_they_do_not_own()
+        {
+            var owner = CreateClientFor(await RegisterAndLoginAsync());
+            var intruder = CreateClientFor(await RegisterAndLoginAsync());
+            var id = await CreateProductAsync(owner);
+
+            var response = await intruder.DeleteAsync($"/api/products/{id}");
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+            var stillThere = await owner.GetAsync($"/api/products/{id}");
+            Assert.Equal(HttpStatusCode.OK, stillThere.StatusCode);
+        }
+
+        private HttpClient CreateClientFor(string token)
+        {
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return client;
+        }
+
+        private static async Task<int> CreateProductAsync(HttpClient client)
+        {
+            var response = await client.PostAsJsonAsync("/api/products", new ProductRequest("Original", null, 5m));
+            response.EnsureSuccessStatusCode();
+            var product = await response.Content.ReadFromJsonAsync<ProductResponse>();
+            return product!.Id;
+        }
     }
 }

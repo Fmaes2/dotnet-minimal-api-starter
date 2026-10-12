@@ -3,7 +3,7 @@
 ### Check that the API is up
 GET {{host}}/health
 
-### Register (the password needs an uppercase letter, a lowercase letter, a digit and a symbol)
+### Register user 1 (returns 400 if the email already exists, which is fine on later runs)
 POST {{host}}/api/auth/register
 Content-Type: application/json
 
@@ -12,7 +12,7 @@ Content-Type: application/json
   "password": "Test1234!"
 }
 
-### Login (stores the token for the requests below)
+### Login as user 1 (stores the token for the requests below)
 # @name login
 POST {{host}}/api/auth/login
 Content-Type: application/json
@@ -22,10 +22,15 @@ Content-Type: application/json
   "password": "Test1234!"
 }
 
+### Who am I (returns the authenticated user)
+GET {{host}}/api/auth/me
+Authorization: Bearer {{login.response.body.$.token}}
+
 ### Without a token: should return 401
 GET {{host}}/api/products
 
-### Create a product
+### Create a product as user 1 (its id is reused by the requests below)
+# @name createProduct
 POST {{host}}/api/products
 Authorization: Bearer {{login.response.body.$.token}}
 Content-Type: application/json
@@ -40,12 +45,12 @@ Content-Type: application/json
 GET {{host}}/api/products?page=1&pageSize=10
 Authorization: Bearer {{login.response.body.$.token}}
 
-### Get a product by id
-GET {{host}}/api/products/1
+### Get the product by id
+GET {{host}}/api/products/{{createProduct.response.body.$.id}}
 Authorization: Bearer {{login.response.body.$.token}}
 
-### Update a product
-PUT {{host}}/api/products/1
+### Update the product as its owner (should return 200)
+PUT {{host}}/api/products/{{createProduct.response.body.$.id}}
 Authorization: Bearer {{login.response.body.$.token}}
 Content-Type: application/json
 
@@ -65,6 +70,44 @@ Content-Type: application/json
   "price": -5
 }
 
-### Delete a product
-DELETE {{host}}/api/products/1
+### Register user 2 (returns 400 if the email already exists, which is fine on later runs)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user2@example.com",
+  "password": "Test1234!"
+}
+
+### Login as user 2
+# @name login2
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user2@example.com",
+  "password": "Test1234!"
+}
+
+### User 2 tries to update user 1's product (should return 403)
+PUT {{host}}/api/products/{{createProduct.response.body.$.id}}
+Authorization: Bearer {{login2.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "Hacked",
+  "description": "Should not be saved",
+  "price": 1
+}
+
+### User 2 tries to delete user 1's product (should return 403)
+DELETE {{host}}/api/products/{{createProduct.response.body.$.id}}
+Authorization: Bearer {{login2.response.body.$.token}}
+
+### Delete the product as its owner (should return 204)
+DELETE {{host}}/api/products/{{createProduct.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.token}}
+
+### The product no longer exists (should return 404)
+GET {{host}}/api/products/{{createProduct.response.body.$.id}}
 Authorization: Bearer {{login.response.body.$.token}}
