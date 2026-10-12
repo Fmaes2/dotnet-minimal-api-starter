@@ -103,6 +103,17 @@ Integration tests use in-memory SQLite, so they need neither Docker nor Postgres
 - This v1 does not include refresh tokens, roles or rate limiting.
 - Automatic migrations on startup (`Database__MigrateOnStartup`) are convenient to get started. In production it is usually better to apply migrations as a separate deployment step.
 
+## Who is this for?
+
+Developers learning ASP.NET Core, or anyone who wants a small working API to start from instead of an empty project. It's a starting point, not a production-ready base.
+
+## Known limitations
+
+- Any authenticated user can update or delete any product (no ownership or roles).
+- Registration is open and login attempts are not limited (no lockout or rate limiting).
+- Tokens last 60 minutes, with no refresh or revocation.
+- `/health` does not check the database.
+
 ## Dependency licenses
 
 | Package | License |
