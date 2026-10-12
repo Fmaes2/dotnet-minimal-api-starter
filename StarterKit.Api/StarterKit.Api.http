@@ -1,0 +1,70 @@
+@host = http://localhost:8080
+
+### Check that the API is up
+GET {{host}}/health
+
+### Register (the password needs an uppercase letter, a lowercase letter, a digit and a symbol)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Test1234!"
+}
+
+### Login (stores the token for the requests below)
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Test1234!"
+}
+
+### Without a token: should return 401
+GET {{host}}/api/products
+
+### Create a product
+POST {{host}}/api/products
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "Test product",
+  "description": "First test",
+  "price": 9.99
+}
+
+### List products (paginated)
+GET {{host}}/api/products?page=1&pageSize=10
+Authorization: Bearer {{login.response.body.$.token}}
+
+### Get a product by id
+GET {{host}}/api/products/1
+Authorization: Bearer {{login.response.body.$.token}}
+
+### Update a product
+PUT {{host}}/api/products/1
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "Updated product",
+  "description": "New description",
+  "price": 19.99
+}
+
+### Validation: empty name and negative price (should return 400)
+POST {{host}}/api/products
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "",
+  "price": -5
+}
+
+### Delete a product
+DELETE {{host}}/api/products/1
+Authorization: Bearer {{login.response.body.$.token}}

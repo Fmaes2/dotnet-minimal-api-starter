@@ -1,0 +1,47 @@
+﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
+using StarterKit.Api.Auth;
+using StarterKit.Api.Validation;
+
+namespace StarterKit.Api.Endpoints;
+
+public static class AuthEndpoints
+{
+    public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/auth").WithTags("Auth");
+
+        group.MapPost("/register", Register).AddEndpointFilter<ValidationFilter<RegisterRequest>>();
+        group.MapPost("/login", Login).AddEndpointFilter<ValidationFilter<LoginRequest>>();
+
+        return app;
+    }
+
+    private static async Task<Results<NoContent, ValidationProblem>> Register(
+        RegisterRequest req, UserManager<IdentityUser> users)
+    {
+        var user = new IdentityUser { UserName = req.Email, Email = req.Email };
+        var result = await users.CreateAsync(user, req.Password);
+
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors
+                .GroupBy(e => e.Code)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray());
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<AuthResponse>, UnauthorizedHttpResult>> Login(
+        LoginRequest req, UserManager<IdentityUser> users, TokenService tokens)
+    {
+        var user = await users.FindByEmailAsync(req.Email);
+        if (user is null || !await users.CheckPasswordAsync(user, req.Password))
+            return TypedResults.Unauthorized();
+
+        var (token, expires) = tokens.CreateToken(user);
+        return TypedResults.Ok(new AuthResponse(token, expires));
+    }
+}

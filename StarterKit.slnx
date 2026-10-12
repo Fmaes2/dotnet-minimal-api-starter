@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="StarterKit.Api/StarterKit.Api.csproj" />
+  <Project Path="StarterKit.Tests/StarterKit.Tests.csproj" />
+</Solution>
