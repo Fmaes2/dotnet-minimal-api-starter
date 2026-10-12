@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using StarterKit.Api.Auth;
 using StarterKit.Api.Data;
 using StarterKit.Api.Domain;
 using StarterKit.Api.Validation;
@@ -47,20 +49,28 @@ public static class ProductEndpoints
         return p is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(p));
     }
 
-    private static async Task<Created<ProductResponse>> Create(ProductRequest req, AppDbContext db)
+    private static async Task<Created<ProductResponse>> Create(
+        ProductRequest req, ClaimsPrincipal user, AppDbContext db)
     {
-        var product = new Product { Name = req.Name, Description = req.Description, Price = req.Price };
+        var product = new Product
+        {
+            Name = req.Name,
+            Description = req.Description,
+            Price = req.Price,
+            OwnerId = user.GetRequiredUserId()
+        };
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
         return TypedResults.Created($"/api/products/{product.Id}", ToResponse(product));
     }
 
-    private static async Task<Results<Ok<ProductResponse>, NotFound>> Update(
-        int id, ProductRequest req, AppDbContext db)
+    private static async Task<Results<Ok<ProductResponse>, NotFound, ForbidHttpResult>> Update(
+        int id, ProductRequest req, ClaimsPrincipal user, AppDbContext db)
     {
         var product = await db.Products.FindAsync(id);
         if (product is null) return TypedResults.NotFound();
+        if (product.OwnerId != user.GetRequiredUserId()) return TypedResults.Forbid();
 
         product.Name = req.Name;
         product.Description = req.Description;
@@ -70,10 +80,12 @@ public static class ProductEndpoints
         return TypedResults.Ok(ToResponse(product));
     }
 
-    private static async Task<Results<NoContent, NotFound>> Delete(int id, AppDbContext db)
+    private static async Task<Results<NoContent, NotFound, ForbidHttpResult>> Delete(
+        int id, ClaimsPrincipal user, AppDbContext db)
     {
         var product = await db.Products.FindAsync(id);
         if (product is null) return TypedResults.NotFound();
+        if (product.OwnerId != user.GetRequiredUserId()) return TypedResults.Forbid();
 
         db.Products.Remove(product);
         await db.SaveChangesAsync();

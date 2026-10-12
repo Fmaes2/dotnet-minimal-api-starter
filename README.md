@@ -54,6 +54,22 @@ The API runs at `http://localhost:8080`. Try `GET /health`, then use `StarterKit
 
 In this mode the API listens on the port shown in the console (it comes from `launchSettings.json`), not on 8080. Update the `@host` variable in the `.http` file to match.
 
+## API endpoints
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/health` | No | Liveness check (does not check the database) |
+| POST | `/api/auth/register` | No | Create a user |
+| POST | `/api/auth/login` | No | Returns a JWT |
+| GET | `/api/auth/me` | Yes | Id and email of the authenticated user |
+| GET | `/api/products` | Yes | List products (paginated with `page` and `pageSize`) |
+| GET | `/api/products/{id}` | Yes | Get a product |
+| POST | `/api/products` | Yes | Create a product (you become its owner) |
+| PUT | `/api/products/{id}` | Yes, owner only | Update a product |
+| DELETE | `/api/products/{id}` | Yes, owner only | Delete a product |
+
+Protected endpoints expect an `Authorization: Bearer <token>` header, with the token returned by the login endpoint. In the Development environment, the OpenAPI document is served at `/openapi/v1.json`.
+
 ## Project structure
 
 ```
@@ -109,7 +125,7 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 
 ## Known limitations
 
-- Any authenticated user can update or delete any product (no ownership or roles).
+- Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
 - Registration is open and login attempts are not limited (no lockout or rate limiting).
 - Tokens last 60 minutes, with no refresh or revocation.
 - `/health` does not check the database.

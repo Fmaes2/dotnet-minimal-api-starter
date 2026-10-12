@@ -19,6 +19,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(p => p.Name).IsRequired().HasMaxLength(200);
             e.Property(p => p.Description).HasMaxLength(1000);
             e.Property(p => p.Price).HasPrecision(18, 2);
+
+            e.HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(p => p.OwnerId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

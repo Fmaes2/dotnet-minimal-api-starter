@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.JsonWebTokens;
 using StarterKit.Api.Auth;
 using StarterKit.Api.Validation;
+using System.Security.Claims;
+
 
 namespace StarterKit.Api.Endpoints;
 
@@ -13,6 +16,8 @@ public static class AuthEndpoints
 
         group.MapPost("/register", Register).AddEndpointFilter<ValidationFilter<RegisterRequest>>();
         group.MapPost("/login", Login).AddEndpointFilter<ValidationFilter<LoginRequest>>();
+
+        group.MapGet("/me", Me).RequireAuthorization();
 
         return app;
     }
@@ -44,4 +49,10 @@ public static class AuthEndpoints
         var (token, expires) = tokens.CreateToken(user);
         return TypedResults.Ok(new AuthResponse(token, expires));
     }
+
+    private static Ok<MeResponse> Me(ClaimsPrincipal user) =>
+    TypedResults.Ok(new MeResponse(
+        user.GetRequiredUserId(),
+        user.FindFirst(JwtRegisteredClaimNames.Email)?.Value
+            ?? user.FindFirst(ClaimTypes.Email)?.Value));
 }
