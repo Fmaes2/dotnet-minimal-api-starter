@@ -136,6 +136,28 @@ namespace StarterKit.Tests
             Assert.Equal(HttpStatusCode.OK, stillThere.StatusCode);
         }
 
+        [Fact]
+        public async Task Me_returns_the_authenticated_user()
+        {
+            var email = $"{Guid.NewGuid():N}@test.com";
+            await _client.PostAsJsonAsync("/api/auth/register", new { email, password = Password });
+            var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
+            var auth = await login.Content.ReadFromJsonAsync<AuthResponse>();
+            var client = CreateClientFor(auth!.Token);
+
+            var me = await client.GetFromJsonAsync<MeResponse>("/api/auth/me");
+
+            Assert.Equal(email, me!.Email);
+            Assert.False(string.IsNullOrEmpty(me.Id));
+        }
+
+        [Fact]
+        public async Task Me_without_token_returns_401()
+        {
+            var response = await _client.GetAsync("/api/auth/me");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
         private HttpClient CreateClientFor(string token)
         {
             var client = factory.CreateClient();
