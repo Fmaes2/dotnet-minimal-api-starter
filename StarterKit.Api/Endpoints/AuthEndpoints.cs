@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.JsonWebTokens;
 using StarterKit.Api.Auth;
+using StarterKit.Api.Middleware;
 using StarterKit.Api.Validation;
 using System.Security.Claims;
 
@@ -14,8 +15,13 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
-        group.MapPost("/register", Register).AddEndpointFilter<ValidationFilter<RegisterRequest>>();
-        group.MapPost("/login", Login).AddEndpointFilter<ValidationFilter<LoginRequest>>();
+        group.MapPost("/register", Register)
+            .AddEndpointFilter<ValidationFilter<RegisterRequest>>()
+            .RequireRateLimiting(RateLimitingExtensions.AuthPolicy);
+
+        group.MapPost("/login", Login)
+            .AddEndpointFilter<ValidationFilter<LoginRequest>>()
+            .RequireRateLimiting(RateLimitingExtensions.AuthPolicy);
 
         group.MapGet("/me", Me).RequireAuthorization();
 

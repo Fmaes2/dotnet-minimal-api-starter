@@ -60,8 +60,9 @@ try
     {
         o.Password.RequiredLength = 8;
         o.User.RequireUniqueEmail = true;
-    })
-        .AddEntityFrameworkStores<AppDbContext>();
+    }).AddEntityFrameworkStores<AppDbContext>();
+
+    builder.Services.AddAuthRateLimiting(builder.Configuration);
 
     builder.Services.AddScoped<TokenService>();
 
@@ -79,6 +80,7 @@ try
         app.MapOpenApi();
 
     app.UseHttpsRedirection();
+    app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
 

@@ -111,3 +111,12 @@ Authorization: Bearer {{login.response.body.$.token}}
 ### The product no longer exists (should return 404)
 GET {{host}}/api/products/{{createProduct.response.body.$.id}}
 Authorization: Bearer {{login.response.body.$.token}}
+
+### Rate limit: send this request 6 times in a row within a minute (the 6th one should return 429)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@example.com",
+  "password": "Wrong1234!"
+}

@@ -15,6 +15,7 @@ namespace StarterKit.Tests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("Jwt:Key", "test-key-with-at-least-32-characters!!");
+            builder.UseSetting("RateLimiting:Auth:PermitLimit", "1000");
 
             builder.ConfigureServices(services =>
             {

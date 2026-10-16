@@ -68,6 +68,8 @@ In this mode the API listens on the port shown in the console (it comes from `la
 | PUT | `/api/products/{id}` | Yes, owner only | Update a product |
 | DELETE | `/api/products/{id}` | Yes, owner only | Delete a product |
 
+`POST /api/auth/register` and `POST /api/auth/login` return `429 Too Many Requests` with a `Retry-After` header when the limit is exceeded.
+
 Protected endpoints expect an `Authorization: Bearer <token>` header, with the token returned by the login endpoint. In the Development environment, the OpenAPI document is served at `/openapi/v1.json`.
 
 ## Project structure
@@ -116,7 +118,8 @@ Integration tests use in-memory SQLite, so they need neither Docker nor Postgres
 - **Generate your own JWT key** and pass it as an environment variable (`Jwt__Key`). Never commit it.
 - Change the Postgres password in the compose file; the current one is just an example.
 - Set `ASPNETCORE_ENVIRONMENT=Production` and put the API behind HTTPS.
-- This v1 does not include refresh tokens, roles or rate limiting.
+- This v1 does not include refresh tokens or roles.
+- The rate limiter keys on the client IP. Behind a reverse proxy or load balancer, configure forwarded headers so it sees the real client IP and not the proxy's. The counters are kept in memory, so they are not shared between several instances.
 - Automatic migrations on startup (`Database__MigrateOnStartup`) are convenient to get started. In production it is usually better to apply migrations as a separate deployment step.
 
 ## Who is this for?
@@ -126,7 +129,7 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 ## Known limitations
 
 - Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
-- Registration is open and login attempts are not limited (no lockout or rate limiting).
+- Registration is open. Login and registration are rate limited per IP (5 requests per minute by default, see `RateLimiting:Auth`), but there is no per-account lockout.
 - Tokens last 60 minutes, with no refresh or revocation.
 - `/health` does not check the database.
 
