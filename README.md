@@ -34,7 +34,7 @@ Edit `.env` and set a JWT key of at least 32 characters. Then:
 docker compose up --build
 ```
 
-The API runs at `http://localhost:8080`. Try `GET /health`, then use `StarterKit.Api/StarterKit.Api.http` to register a user, log in and call the endpoints.
+The API runs at `http://localhost:8080`. Try `GET /health/live` and `GET /health/ready`, then use `StarterKit.Api/StarterKit.Api.http` to register a user, log in and call the endpoints.
 
 ## Local development (API from your IDE, database in Docker)
 
