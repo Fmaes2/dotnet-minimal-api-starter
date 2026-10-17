@@ -1,7 +1,10 @@
 @host = http://localhost:8080
 
 ### Check that the API is up
-GET {{host}}/health
+GET {{host}}/health/live
+
+### Check that the DB is up
+GET {{host}}/health/ready
 
 ### Register user 1 (returns 400 if the email already exists, which is fine on later runs)
 POST {{host}}/api/auth/register

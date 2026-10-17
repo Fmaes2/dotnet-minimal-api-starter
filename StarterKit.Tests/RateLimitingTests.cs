@@ -40,7 +40,7 @@ public class RateLimitingTests(RateLimitedApiFactory factory) : IClassFixture<Ra
     {
         for (var i = 0; i < 10; i++)
         {
-            var response = await _client.GetAsync("/health");
+            var response = await _client.GetAsync("/health/live");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
     }

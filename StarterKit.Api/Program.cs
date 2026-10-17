@@ -1,15 +1,15 @@
-using System.Text;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Identity;
 using Serilog;
-using FluentValidation;
-using StarterKit.Api.Endpoints;
 using StarterKit.Api.Auth;
 using StarterKit.Api.Data;
+using StarterKit.Api.Endpoints;
 using StarterKit.Api.Middleware;
-
+using System.Text;
 
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
 
@@ -71,6 +71,9 @@ try
 
     builder.Services.AddScoped<TokenService>();
 
+    builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+
     var app = builder.Build();
     if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     {
@@ -89,7 +92,15 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = _ => false
+    });
+
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
 
     app.MapProductEndpoints();
     app.MapAuthEndpoints();
