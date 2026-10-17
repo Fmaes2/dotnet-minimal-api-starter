@@ -38,15 +38,20 @@ try
 
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.Section));
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+        .AddJwtBearer(o =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwt.Issuer,
-            ValidAudience = jwt.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key))
+            o.MapInboundClaims = false;
+
+            o.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwt.Issuer,
+                ValidAudience = jwt.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key))
+            };
         });
     builder.Services.AddAuthorization();
 
