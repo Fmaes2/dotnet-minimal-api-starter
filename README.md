@@ -58,7 +58,8 @@ In this mode the API listens on the port shown in the console (it comes from `la
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/health` | No | Liveness check (does not check the database) |
+| GET | `/health/live` | No | Liveness check: the process is up (does not check the database) |
+| GET | `/health/ready` | No | Readiness check: also verifies the database connection (returns 503 if it fails) |
 | POST | `/api/auth/register` | No | Create a user |
 | POST | `/api/auth/login` | No | Returns a JWT |
 | GET | `/api/auth/me` | Yes | Id and email of the authenticated user |
@@ -68,7 +69,8 @@ In this mode the API listens on the port shown in the console (it comes from `la
 | PUT | `/api/products/{id}` | Yes, owner only | Update a product |
 | DELETE | `/api/products/{id}` | Yes, owner only | Delete a product |
 
-`POST /api/auth/register` and `POST /api/auth/login` return `429 Too Many Requests` with a `Retry-After` header when the limit is exceeded.
+- `POST /api/auth/register` and `POST /api/auth/login` return `429 Too Many Requests` with a `Retry-After` header when the limit is exceeded.
+- Use `/health/live` for liveness probes (restart the container if it fails) and `/health/ready` for readiness probes (stop sending traffic if it fails).
 
 Protected endpoints expect an `Authorization: Bearer <token>` header, with the token returned by the login endpoint. In the Development environment, the OpenAPI document is served at `/openapi/v1.json`.
 
@@ -131,7 +133,6 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 - Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
 - Registration is open. Login and registration are rate limited per IP (5 requests per minute by default, see `RateLimiting:Auth`), but there is no per-account lockout.
 - Tokens last 60 minutes, with no refresh or revocation.
-- `/health` does not check the database.
 
 ## Dependency licenses
 
