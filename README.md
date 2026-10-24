@@ -7,7 +7,7 @@ A ready-to-use Web API template with Minimal APIs, JWT authentication, PostgreSQ
 ## What's included
 
 - **Minimal APIs** organized by feature, using `MapGroup`
-- **Authentication** with ASP.NET Core Identity and JWT tokens
+- **Authentication** with ASP.NET Core Identity, short-lived JWT access tokens and rotating refresh tokens
 - **EF Core + PostgreSQL**, with migrations and pagination
 - **Validation** with FluentValidation through a reusable endpoint filter
 - **Global error handling** in ProblemDetails format
@@ -50,6 +50,7 @@ The API runs at `http://localhost:8080`. Try `GET /health/live` and `GET /health
 ```bash
    dotnet ef database update --project StarterKit.Api
 ```
+   Run this command again whenever you pull changes that include new migrations.
 4. Run the API from your IDE, or with `dotnet run --project StarterKit.Api`.
 
 In this mode the API listens on the port shown in the console (it comes from `launchSettings.json`), not on 8080. Update the `@host` variable in the `.http` file to match.
@@ -61,7 +62,10 @@ In this mode the API listens on the port shown in the console (it comes from `la
 | GET | `/health/live` | No | Liveness check: the process is up (does not check the database) |
 | GET | `/health/ready` | No | Readiness check: also verifies the database connection (returns 503 if it fails) |
 | POST | `/api/auth/register` | No | Create a user |
-| POST | `/api/auth/login` | No | Returns a JWT |
+| POST | `/api/auth/login` | No | Returns an access token and a refresh token |
+| POST | `/api/auth/refresh` | No | Exchanges a refresh token for a new token pair |
+| POST | `/api/auth/logout` | No | Revokes a refresh token (and its whole session) |
+| POST | `/api/auth/logout-all` | Yes | Revokes every refresh token of the current user |
 | GET | `/api/auth/me` | Yes | Id and email of the authenticated user |
 | GET | `/api/products` | Yes | List products (paginated with `page` and `pageSize`) |
 | GET | `/api/products/{id}` | Yes | Get a product |
@@ -69,10 +73,42 @@ In this mode the API listens on the port shown in the console (it comes from `la
 | PUT | `/api/products/{id}` | Yes, owner only | Update a product |
 | DELETE | `/api/products/{id}` | Yes, owner only | Delete a product |
 
-- `POST /api/auth/register` and `POST /api/auth/login` return `429 Too Many Requests` with a `Retry-After` header when the limit is exceeded.
+- `POST /api/auth/register`, `POST /api/auth/login` and `POST /api/auth/refresh` return `429 Too Many Requests` with a `Retry-After` header when the limit is exceeded.
 - Use `/health/live` for liveness probes (restart the container if it fails) and `/health/ready` for readiness probes (stop sending traffic if it fails).
 
-Protected endpoints expect an `Authorization: Bearer <token>` header, with the token returned by the login endpoint. In the Development environment, the OpenAPI document is served at `/openapi/v1.json`.
+Protected endpoints expect an `Authorization: Bearer <access token>` header, with the access token returned by the login or refresh endpoints. In the Development environment, the OpenAPI document is served at `/openapi/v1.json`.
+
+## Refresh tokens
+
+Login returns two tokens:
+
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "accessTokenExpiresAt": "2026-10-24T15:45:00Z",
+  "refreshToken": "q3Zx...",
+  "refreshTokenExpiresAt": "2026-10-31T15:30:00Z"
+}
+```
+
+- The **access token** is a JWT that lasts 15 minutes. Send it in the `Authorization` header.
+- The **refresh token** is an opaque random value that lasts 7 days. When the access token expires, send the refresh token to `POST /api/auth/refresh` (`{ "refreshToken": "..." }`) to get a new pair.
+
+How it works:
+
+- **Storage**: only a SHA-256 hash of each refresh token is stored in the database, never the token itself.
+- **Rotation**: every refresh token can be used once. Using it returns a new refresh token and invalidates the old one.
+- **Reuse detection**: if an already used refresh token is presented again, the API assumes it was stolen and revokes the whole session (every token issued since that login). The client has to log in again.
+- **Logout**: `POST /api/auth/logout` revokes the session of the given refresh token. It always returns `204`, so it does not reveal whether a token exists. `POST /api/auth/logout-all` revokes every session of the authenticated user.
+
+Configuration (section `Jwt`):
+
+| Setting | Default | Description |
+|---|---|---|
+| `ExpiresMinutes` | 15 | Access token lifetime |
+| `RefreshTokenDays` | 7 | Refresh token lifetime |
+
+> **Breaking change**: the login response used to be `{ "token", "expiresAt" }`. It is now `{ "accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt" }`, and the default access token lifetime went from 60 to 15 minutes.
 
 ## Project structure
 
@@ -83,7 +119,7 @@ StarterKit/
 │   ├── Endpoints/      Routes grouped by feature
 │   ├── Domain/         Entities
 │   ├── Data/           DbContext and migrations
-│   ├── Auth/           JWT options and token generation
+│   ├── Auth/           JWT options, access tokens and refresh tokens
 │   ├── Validation/     Validators and validation filter
 │   └── Middleware/     Global exception handler
 └── StarterKit.Tests/   Unit and integration tests
@@ -114,13 +150,14 @@ Integration tests use in-memory SQLite, so they need neither Docker nor Postgres
 - **HTTPS certificate warning** when running with `dotnet run`: run `dotnet dev-certs https --trust`.
 - **Port already in use**: change the left-hand side of the port mapping in `docker-compose.yml` (for example `"8081:8080"` for the API, or `"5434:5432"` for the database). If you change the database port, update `appsettings.Development.json` too.
 - **`dotnet ef` not found**: install it with `dotnet tool install --global dotnet-ef`.
+- **`500` on login after pulling new changes**, with `relation "RefreshTokens" does not exist` (or another missing table) in the logs: the database is missing a migration. Run `dotnet ef database update --project StarterKit.Api`.
 
 ## Security: what to change before deploying
 
 - **Generate your own JWT key** and pass it as an environment variable (`Jwt__Key`). Never commit it.
 - Change the Postgres password in the compose file; the current one is just an example.
 - Set `ASPNETCORE_ENVIRONMENT=Production` and put the API behind HTTPS.
-- This v1 does not include refresh tokens or roles.
+- Refresh tokens are returned in the response body. For browser-based clients (SPAs), consider storing them in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie instead; this template does not do that yet.
 - The rate limiter keys on the client IP. Behind a reverse proxy or load balancer, configure forwarded headers so it sees the real client IP and not the proxy's. The counters are kept in memory, so they are not shared between several instances.
 - Automatic migrations on startup (`Database__MigrateOnStartup`) are convenient to get started. In production it is usually better to apply migrations as a separate deployment step.
 
@@ -132,7 +169,10 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 
 - Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
 - Registration is open. Login and registration are rate limited per IP (5 requests per minute by default, see `RateLimiting:Auth`), but there is no per-account lockout.
-- Tokens last 60 minutes, with no refresh or revocation.
+- Access tokens cannot be revoked: after a logout they remain valid until they expire (15 minutes at most).
+- If a client sends two refresh requests at the same time with the same token, only one succeeds; the other gets `401`. Clients should make sure only one refresh is in flight at a time.
+- Expired and revoked refresh tokens are not cleaned up from the database automatically.
+- There are no roles yet.
 
 ## Dependency licenses
 
@@ -151,4 +191,4 @@ Released under the [MIT License](LICENSE).
 
 ## Feedback
 
-Missing something? Open a [Discussion](../../discussions) and tell me what you struggle with when building APIs (refresh tokens, roles, multi-tenancy...). It helps me decide what to build next.
+Missing something? Open a [Discussion](../../discussions) and tell me what you struggle with when building APIs (roles, multi-tenancy, observability...). It helps me decide what to build next.
