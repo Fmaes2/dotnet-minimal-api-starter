@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using StarterKit.Api.Auth;
@@ -70,6 +71,9 @@ try
     builder.Services.AddAuthRateLimiting(builder.Configuration);
 
     builder.Services.AddScoped<TokenService>();
+
+    builder.Services.TryAddSingleton(TimeProvider.System);
+    builder.Services.AddScoped<RefreshTokenService>();
 
     builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
