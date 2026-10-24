@@ -123,3 +123,22 @@ Content-Type: application/json
   "email": "nobody@example.com",
   "password": "Wrong1234!"
 }
+
+### Refresh (uses the token from login)
+# @name refresh
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.$.refreshToken}}" }
+
+### Refresh with the rotated token
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh.response.body.$.refreshToken}}" }
+
+### Logout
+POST {{host}}/api/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.$.refreshToken}}" }

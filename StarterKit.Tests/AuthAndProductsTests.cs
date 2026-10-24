@@ -24,7 +24,7 @@ namespace StarterKit.Tests
             login.EnsureSuccessStatusCode();
 
             var auth = await login.Content.ReadFromJsonAsync<AuthResponse>();
-            return auth!.Token;
+            return auth!.AccessToken;
         }
 
         [Fact]
@@ -143,7 +143,7 @@ namespace StarterKit.Tests
             await _client.PostAsJsonAsync("/api/auth/register", new { email, password = Password });
             var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = Password });
             var auth = await login.Content.ReadFromJsonAsync<AuthResponse>();
-            var client = CreateClientFor(auth!.Token);
+            var client = CreateClientFor(auth!.AccessToken);
 
             var me = await client.GetFromJsonAsync<MeResponse>("/api/auth/me");
 
