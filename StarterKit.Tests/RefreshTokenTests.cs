@@ -1,10 +1,11 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
+﻿using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using StarterKit.Api.Endpoints;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 
 namespace StarterKit.Tests;
 
@@ -55,16 +56,20 @@ public class RefreshTokenTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Refresh_ReusingOldToken_RevokesWholeFamily()
+    public async Task Refresh_ReusingRotatedTokenAfterLeeway_RevokesWholeFamily()
     {
-        var client = factory.CreateClient();
+        var (app, clock) = CreateAppWithFakeClock();
+        using var _ = app;
+        var client = app.CreateClient();
         var login = await RegisterAndLoginAsync(client);
         var first = await RefreshAsync(client, login.RefreshToken);
         var rotated = (await first.Content.ReadFromJsonAsync<AuthResponse>())!;
 
-        await RefreshAsync(client, login.RefreshToken); // reuse: should revoke the family
+        clock.Advance(TimeSpan.FromSeconds(11));
+        var reuse = await RefreshAsync(client, login.RefreshToken);
         var afterReuse = await RefreshAsync(client, rotated.RefreshToken);
 
+        Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
     }
 
@@ -91,9 +96,8 @@ public class RefreshTokenTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Refresh_WithExpiredToken_Returns401()
     {
-        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        using var app = factory.WithWebHostBuilder(b =>
-            b.ConfigureTestServices(s => s.AddSingleton<TimeProvider>(clock)));
+        var (app, clock) = CreateAppWithFakeClock();
+        using var _ = app;
         var client = app.CreateClient();
         var login = await RegisterAndLoginAsync(client);
 
@@ -152,6 +156,24 @@ public class RefreshTokenTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Refresh_ReusingRotatedTokenWithinLeeway_KeepsFamily()
+    {
+        var (app, clock) = CreateAppWithFakeClock();
+        using var _ = app;
+        var client = app.CreateClient();
+        var login = await RegisterAndLoginAsync(client);
+        var first = await RefreshAsync(client, login.RefreshToken);
+        var rotated = (await first.Content.ReadFromJsonAsync<AuthResponse>())!;
+
+        clock.Advance(TimeSpan.FromSeconds(9));
+        var reuse = await RefreshAsync(client, login.RefreshToken);
+        var next = await RefreshAsync(client, rotated.RefreshToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+    }
+
     private static string NewEmail() => $"{Guid.NewGuid():N}@example.com";
 
     private static async Task<AuthResponse> RegisterAndLoginAsync(HttpClient client, string? email = null)
@@ -171,4 +193,12 @@ public class RefreshTokenTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private static Task<HttpResponseMessage> RefreshAsync(HttpClient client, string token) =>
         client.PostAsJsonAsync("/api/auth/refresh", new { refreshToken = token });
+
+    private (WebApplicationFactory<Program> App, FakeTimeProvider Clock) CreateAppWithFakeClock()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var app = factory.WithWebHostBuilder(b =>
+            b.ConfigureTestServices(s => s.AddSingleton<TimeProvider>(clock)));
+        return (app, clock);
+    }
 }
