@@ -99,6 +99,7 @@ How it works:
 - **Storage**: only a SHA-256 hash of each refresh token is stored in the database, never the token itself.
 - **Rotation**: every refresh token can be used once. Using it returns a new refresh token and invalidates the old one.
 - **Reuse detection**: if an already used refresh token is presented again, the API assumes it was stolen and revokes the whole session (every token issued since that login). The client has to log in again.
+- **Reuse leeway**: a rotated token reused within a few seconds of its rotation (10 s by default) gets `401` but does **not** revoke the session. This covers a second tab or a slow retry that sent the old token before seeing the new one: the client can pick up the new token and carry on. Outside the leeway, reuse detection applies as usual.
 - **Logout**: `POST /api/auth/logout` revokes the session of the given refresh token. It always returns `204`, so it does not reveal whether a token exists. `POST /api/auth/logout-all` revokes every session of the authenticated user.
 
 Configuration (section `Jwt`):
@@ -107,6 +108,7 @@ Configuration (section `Jwt`):
 |---|---|---|
 | `ExpiresMinutes` | 15 | Access token lifetime |
 | `RefreshTokenDays` | 7 | Refresh token lifetime |
+| `RefreshTokenReuseLeewaySeconds` | 10 | Seconds after a rotation during which reusing the old token does not revoke the session. `0` disables the leeway |
 
 > **Breaking change**: the login response used to be `{ "token", "expiresAt" }`. It is now `{ "accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt" }`, and the default access token lifetime went from 60 to 15 minutes.
 
@@ -168,11 +170,11 @@ Developers learning ASP.NET Core, or anyone who wants a small working API to sta
 ## Known limitations
 
 - Products are visible to every authenticated user. Only the owner can update or delete a product, but there are no roles yet (for example, no admin who can edit any product).
-- Registration is open. Login and registration are rate limited per IP (5 requests per minute by default, see `RateLimiting:Auth`), but there is no per-account lockout.
+- Registration is open. Login, registration and refresh are rate limited per IP (5 requests per minute by default, see `RateLimiting:Auth`), but there is no per-account lockout.
 - Access tokens cannot be revoked: after a logout they remain valid until they expire (15 minutes at most).
-- If a client sends two refresh requests at the same time with the same token, only one succeeds; the other gets `401`. Clients should make sure only one refresh is in flight at a time.
+- The reuse leeway trades some detection for usability: if an attacker rotates a stolen token first and the real client reuses it within the leeway, the theft is not detected. The attacker still gets nothing from the old token, but keeps the new one. The default of 10 seconds is a reasoned guess, not a measured value: every reuse is logged with the elapsed seconds (`ElapsedSeconds`), so you can check the real distribution in your deployment and adjust `Jwt:RefreshTokenReuseLeewaySeconds`.
+- Every rotation extends the refresh token lifetime by 7 days, so there is no absolute session limit yet.
 - Expired and revoked refresh tokens are not cleaned up from the database automatically.
-- There are no roles yet.
 
 ## Dependency licenses
 
