@@ -8,4 +8,5 @@ public class JwtOptions
     public string Key { get; set; } = "";
     public int ExpiresMinutes { get; set; } = 60;
     public int RefreshTokenDays { get; set; } = 7;
+    public int RefreshTokenReuseLeewaySeconds { get; set; } = 10;
 }
